@@ -66,19 +66,18 @@ class MarkowitzOptimizer:
 
     def min_variance_portfolio(self, short_selling: bool = False) -> Dict[str, object]:
         """Find the Global Minimum Variance (GMV) portfolio."""
-        def port_vol(w):
-            return np.sqrt(w.T @ self.annualized_cov_matrix @ weights)
-
-        def objective(w):
-            return w.T @ self.annualized_cov_matrix @ w
-
-        constraints = [{"type": "eq", "fun": lambda w: np.sum(w) - 1.0}]
+        constraints = [{
+            "type": "eq",
+            "fun": lambda w: w.sum() - 1.0,
+            "jac": lambda w: np.ones_like(w),
+        }]
         bounds = tuple((-1.0, 1.0) if short_selling else (0.0, 1.0) for _ in range(self.n_assets))
         init_guess = np.ones(self.n_assets) / self.n_assets
 
         res = minimize(
-            objective,
+            self._variance,
             init_guess,
+            jac=self._variance_gradient,
             method="SLSQP",
             bounds=bounds,
             constraints=constraints,
@@ -98,6 +97,12 @@ class MarkowitzOptimizer:
             "success": res.success,
         }
 
+    def _variance(self, weights):
+        return float(weights @ self.annualized_cov_matrix @ weights)
+
+    def _variance_gradient(self, weights):
+        return 2.0 * (self.annualized_cov_matrix @ weights)
+
     def calculate_efficient_frontier(
         self,
         n_points: int = 50,
@@ -105,29 +110,44 @@ class MarkowitzOptimizer:
     ) -> List[Dict[str, float]]:
         """Generates the Markowitz Efficient Frontier curve points."""
         gmv = self.min_variance_portfolio(short_selling=short_selling)
-        max_ret = float(np.max(self.annualized_returns))
         min_ret = gmv["expected_return"]
+        sorted_returns = np.sort(self.annualized_returns)
+        if short_selling:
+            short_count = (self.n_assets - 1) // 2
+            max_ret = sorted_returns[-(short_count + 1):].sum() - sorted_returns[:short_count].sum()
+        else:
+            max_ret = sorted_returns[-1]
 
-        target_returns = np.linspace(min_ret, max_ret * 0.99, n_points)
+        if np.isclose(min_ret, max_ret, rtol=0, atol=1e-12):
+            return [{
+                "return": min_ret,
+                "volatility": gmv["volatility"],
+                "sharpe_ratio": gmv["sharpe_ratio"],
+            }]
+
+        target_returns = np.linspace(min_ret, max_ret, n_points)
         frontier_points = []
-
-        bounds = tuple((-1.0, 1.0) if short_selling else (0.0, 1.0) for _ in range(self.n_assets))
-        init_guess = np.ones(self.n_assets) / self.n_assets
+        bounds = [(-1.0, 1.0) if short_selling else (0.0, 1.0)] * self.n_assets
+        init_guess = gmv["weights_array"]
+        constraint_jacobian = np.vstack([np.ones(self.n_assets), self.annualized_returns])
 
         for target in target_returns:
-            constraints = [
-                {"type": "eq", "fun": lambda w: np.sum(w) - 1.0},
-                {"type": "eq", "fun": lambda w, t=target: np.sum(self.annualized_returns * w) - t},
-            ]
+            constraints = [{
+                "type": "eq",
+                "fun": lambda w: constraint_jacobian @ w - [1.0, target],
+                "jac": lambda w: constraint_jacobian,
+            }]
             res = minimize(
-                lambda w: w.T @ self.annualized_cov_matrix @ w,
+                self._variance,
                 init_guess,
+                jac=self._variance_gradient,
                 method="SLSQP",
                 bounds=bounds,
                 constraints=constraints,
                 options={"ftol": 1e-8, "maxiter": 500},
             )
             if res.success:
+                init_guess = res.x
                 vol = np.sqrt(res.x.T @ self.annualized_cov_matrix @ res.x)
                 s = (target - self.risk_free_rate) / vol if vol > 0 else 0.0
                 frontier_points.append({

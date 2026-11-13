@@ -169,9 +169,7 @@ with tab2:
     for idx in sample_indices:
         ax2.plot(days, trajectories[idx], color="gray", alpha=0.08, linewidth=1)
 
-    p50_path = np.percentile(trajectories, 50, axis=0)
-    p95_path = np.percentile(trajectories, 95, axis=0)
-    p5_path = np.percentile(trajectories, 5, axis=0)
+    p5_path, p50_path, p95_path = np.percentile(trajectories, [5, 50, 95], axis=0)
 
     ax2.plot(days, p50_path, color="blue", linewidth=2.5, label="Median Path (P50)")
     ax2.plot(days, p95_path, color="green", linestyle="--", linewidth=2, label="95th Percentile")

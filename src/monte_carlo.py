@@ -36,27 +36,23 @@ class MonteCarloEngine:
         # A weighted sum of jointly normal returns is itself normal.
         mean = self.weights @ self.mean_returns
         variance = self.weights @ self.cov_matrix @ self.weights
-        portfolio_daily_returns = np.random.default_rng(self.seed).normal(
-            mean, np.sqrt(max(variance, 0.0)), size=(iterations, time_horizon_days)
-        )
-        # A daily loss cannot exceed the full value of a long-only portfolio.
-        np.maximum(portfolio_daily_returns, -1.0, out=portfolio_daily_returns)
-
-        # Compound returns across the time horizon
-        # Shape: (iterations, time_horizon_days + 1)
-        cumulative_growth = np.cumprod(1.0 + portfolio_daily_returns, axis=1)
-        trajectories = np.hstack([np.ones((iterations, 1)), cumulative_growth]) * self.initial_investment
+        trajectories = np.empty((iterations, time_horizon_days + 1))
+        trajectories[:, 0] = self.initial_investment
+        growth = trajectories[:, 1:]
+        rng = np.random.default_rng(self.seed)
+        # Bound temporary memory while preserving the seeded draw sequence.
+        for start in range(0, iterations, 1024):
+            batch = growth[start:start + 1024]
+            batch[:] = rng.normal(mean, np.sqrt(max(variance, 0.0)), size=batch.shape)
+        np.maximum(growth, -1.0, out=growth)
+        growth += 1.0
+        np.cumprod(growth, axis=1, out=growth)
+        growth *= self.initial_investment
 
         terminal_values = trajectories[:, -1]
-
-        # Calculate percentile distributions
-        p1 = np.percentile(terminal_values, 1.0)
-        p5 = np.percentile(terminal_values, 5.0)
-        p25 = np.percentile(terminal_values, 25.0)
-        p50 = np.percentile(terminal_values, 50.0)
-        p75 = np.percentile(terminal_values, 75.0)
-        p95 = np.percentile(terminal_values, 95.0)
-        p99 = np.percentile(terminal_values, 99.0)
+        p1, p5, p25, p50, p75, p95, p99 = np.percentile(
+            terminal_values, [1, 5, 25, 50, 75, 95, 99]
+        )
 
         # Probability of capital impairment (< initial_investment)
         prob_of_loss = float(np.mean(terminal_values < self.initial_investment))

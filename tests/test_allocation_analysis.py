@@ -47,3 +47,18 @@ def test_dashboard_modes_render():
     app.sidebar.radio[0].set_value("Optimization and simulation").run()
     assert not app.exception
     assert len(app.metric) == 8
+
+
+def test_frontier_reaches_best_negative_return():
+    from src.markowitz import MarkowitzOptimizer
+
+    returns = pd.DataFrame({
+        "A": [-0.03, -0.01, -0.02, -0.02],
+        "B": [-0.02, 0.01, -0.03, 0.0],
+    })
+    optimizer = MarkowitzOptimizer(returns)
+    frontier = optimizer.calculate_efficient_frontier(10)
+    assert len(frontier) == 10
+    assert frontier[-1]["return"] == pytest.approx(optimizer.annualized_returns.max())
+    assert all(left["volatility"] <= right["volatility"] + 1e-8
+               for left, right in zip(frontier, frontier[1:]))

@@ -10,8 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 
 from src.portfolio_advisor import PortfolioRiskAdvisor
-from src.markowitz import MarkowitzOptimizer
-from src.risk_metrics import RiskMetricsCalculator
+from holdings_view import show_holdings_analysis
 
 st.set_page_config(
     page_title="Quantitative Portfolio Risk Advisor",
@@ -19,11 +18,9 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("📈 AI-Driven Quantitative Portfolio Risk Advisor")
-st.markdown("""
-*Institutional-grade risk modeling engine integrating Markowitz Modern Portfolio Theory (MPT),
-10,000+ Monte Carlo path simulations, and NLP sentiment alpha dynamic tilting.*
-""")
+st.title("Portfolio Risk Advisor")
+st.caption("Educational portfolio analysis with historical estimates and hypothetical scenarios.")
+view = st.sidebar.radio("Analysis", ["Holdings and stress tests", "Optimization and simulation"])
 
 # Sidebar Controls
 st.sidebar.header("⚙️ Simulation & Portfolio Parameters")
@@ -45,10 +42,16 @@ risk_free_rate = st.sidebar.slider(
     step=0.25,
 ) / 100.0
 
+if view == "Holdings and stress tests":
+    show_holdings_analysis(portfolio_capital, risk_free_rate)
+    st.stop()
+
+st.info("This model uses synthetic prices and illustrative sentiment scores.")
+
 mc_iterations = st.sidebar.select_slider(
     "Monte Carlo Iterations",
     options=[1_000, 5_000, 10_000, 20_000],
-    value=10_000,
+    value=1_000,
 )
 
 time_horizon = st.sidebar.slider(
@@ -93,8 +96,8 @@ st.divider()
 # Tab Layout
 tab1, tab2, tab3 = st.tabs([
     "📊 Markowitz Efficient Frontier & Allocation",
-    "🎲 Monte Carlo 10,000+ Simulations",
-    "🛡️ Institutional Risk & VaR Analysis",
+    "🎲 Monte Carlo Simulation",
+    "🛡️ Risk and VaR",
 ])
 
 with tab1:
@@ -134,6 +137,7 @@ with tab1:
         ax.grid(True, linestyle="--", alpha=0.5)
         ax.legend()
         st.pyplot(fig)
+        plt.close(fig)
 
     with col_right:
         st.subheader("Asset Allocations (Base vs Sentiment Tilted)")
@@ -161,7 +165,7 @@ with tab2:
     days = np.arange(time_horizon + 1)
 
     # Plot sample trajectories
-    sample_indices = np.random.choice(mc_iterations, size=min(100, mc_iterations), replace=False)
+    sample_indices = np.random.default_rng(42).choice(mc_iterations, size=min(100, mc_iterations), replace=False)
     for idx in sample_indices:
         ax2.plot(days, trajectories[idx], color="gray", alpha=0.08, linewidth=1)
 
@@ -180,6 +184,7 @@ with tab2:
     ax2.grid(True, linestyle="--", alpha=0.5)
     ax2.legend()
     st.pyplot(fig2)
+    plt.close(fig2)
 
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     col_m1.metric("Probability of Capital Loss", f"{mc['prob_of_loss']*100:.1f}%")
@@ -204,6 +209,6 @@ with tab3:
         st.write(f"- **Historical Maximum Drawdown (MDD)**: `{t_rep['maximum_drawdown']*100:.2f}%`")
         st.write(f"- **Calmar Ratio**: `{t_rep['calmar_ratio']:.2f}`")
         st.write(f"- **Annualized Volatility**: `{t_rep['annualized_volatility']*100:.2f}%`")
-        st.write(f"- **1-Year Monte Carlo VaR (95%)**: `${mc['mc_var_95']:,.2f}`")
+        st.write(f"- **{time_horizon}-Day Monte Carlo VaR (95%)**: `${mc['mc_var_95']:,.2f}`")
 
-st.caption("Deepanshu Kushwaha | Quantitative Portfolio Risk Advisor Engine | PyTorch & SciPy")
+st.caption("Deepanshu Kushwaha | Quantitative Portfolio Risk Advisor Engine")

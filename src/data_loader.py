@@ -27,16 +27,16 @@ class MarketDataLoader:
         Simulate correlated multi-asset price histories using Cholesky Decomposition
         on Geometric Brownian Motion (GBM).
         """
-        np.random.seed(self.seed)
+        rng = np.random.default_rng(self.seed)
         n_assets = len(self.tickers)
         dt = 1.0 / 252.0  # Daily time step
 
         # Baseline annual drift and volatility for assets
-        drifts = np.random.uniform(drift_range[0], drift_range[1], n_assets)
-        vols = np.random.uniform(vol_range[0], vol_range[1], n_assets)
+        drifts = rng.uniform(drift_range[0], drift_range[1], n_assets)
+        vols = rng.uniform(vol_range[0], vol_range[1], n_assets)
 
         # Base correlation matrix with realistic market co-movements
-        raw_cov = np.random.uniform(0.2, 0.6, (n_assets, n_assets))
+        raw_cov = rng.uniform(0.2, 0.6, (n_assets, n_assets))
         cov_matrix = (raw_cov + raw_cov.T) / 2.0
         np.fill_diagonal(cov_matrix, 1.0)
         
@@ -49,7 +49,7 @@ class MarketDataLoader:
         L = np.linalg.cholesky(corr_matrix)
 
         # Generate correlated standard normal innovations
-        z = np.random.normal(size=(periods, n_assets))
+        z = rng.normal(size=(periods, n_assets))
         correlated_z = z @ L.T
 
         # Initial prices
@@ -72,7 +72,7 @@ class MarketDataLoader:
     @staticmethod
     def compute_daily_returns(prices: pd.DataFrame) -> pd.DataFrame:
         """Compute simple percentage returns from price history."""
-        return prices.pct_change().dropna()
+        return prices.pct_change(fill_method=None).dropna()
 
     @staticmethod
     def compute_log_returns(prices: pd.DataFrame) -> pd.DataFrame:

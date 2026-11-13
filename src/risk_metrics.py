@@ -49,12 +49,10 @@ class RiskMetricsCalculator:
     ) -> float:
         """Annualized Sortino Ratio focusing on downside volatility."""
         mean_annual_return = portfolio_returns.mean() * cls.TRADING_DAYS_PER_YEAR
-        downside_returns = portfolio_returns[portfolio_returns < target_return]
-        if len(downside_returns) == 0:
-            return np.nan
-        downside_deviation = np.sqrt((downside_returns**2).mean()) * np.sqrt(cls.TRADING_DAYS_PER_YEAR)
+        shortfalls = np.minimum(portfolio_returns - target_return, 0)
+        downside_deviation = np.sqrt((shortfalls**2).mean() * cls.TRADING_DAYS_PER_YEAR)
         if downside_deviation == 0:
-            return 0.0
+            return np.nan
         return float((mean_annual_return - risk_free_rate) / downside_deviation)
 
     @classmethod
@@ -135,7 +133,7 @@ class RiskMetricsCalculator:
 
         # Drawdown
         cum_returns = (1.0 + daily_portfolio_returns).cumprod()
-        mdd, _ = cls.maximum_drawdown(cum_returns)
+        mdd, _ = cls.maximum_drawdown(np.r_[1.0, cum_returns.to_numpy()])
 
         # Performance Ratios
         ann_return = cls.portfolio_return(weights, mean_returns)

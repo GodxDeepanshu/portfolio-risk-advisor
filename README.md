@@ -1,127 +1,62 @@
-# AI-Driven Quantitative Portfolio Risk Advisor
+# Portfolio Risk Advisor
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+A Streamlit dashboard for comparing portfolio risk, running stress tests, and
+exploring long-only Markowitz allocations and Monte Carlo scenarios.
 
-An institutional-grade quantitative risk modeling and optimization platform. Features continuous Markowitz Modern Portfolio Theory (MPT) quadratic programming, 10,000+ iteration vectorized Monte Carlo simulations, parametric and historical tail-risk diagnostics (VaR 95%/99%, Conditional VaR / Expected Shortfall), and an NLP headline sentiment pipeline for dynamic portfolio risk exposure rebalancing.
+## Run locally
 
----
+Use Python 3.10 or later. Create a virtual environment with
+`python -m venv .venv` and activate it before installing dependencies.
 
-## 📌 Key Architectural Pillars
-
-1. **Markowitz Efficient Frontier Optimization**:
-   - Solves non-linear constrained portfolio allocations using Sequential Least Squares Programming (`SLSQP`).
-   - Identifies the **Global Minimum Variance (GMV)** and **Maximum Sharpe Ratio (Tangency)** portfolios.
-   - Generates the continuous Capital Allocation Line (CAL).
-
-2. **10,000+ Vectorized Monte Carlo Path Simulation**:
-   - Simulates multi-asset correlated Geometric Brownian Motion (GBM) via Cholesky decomposition ($L L^T = \Sigma$).
-   - Projects distribution fan charts across 252+ trading days to compute probability of capital loss, terminal wealth percentiles ($P_5, P_{50}, P_{95}$), and stress drawdowns.
-
-3. **Institutional Tail Risk Diagnostics**:
-   - **Parametric VaR (95% & 99%)**: Analytical normal variance-covariance framework.
-   - **Historical VaR & CVaR (Expected Shortfall)**: Non-parametric empirical quantile analysis accounting for fat tails and leptokurtic return distributions.
-   - **Downside Risk Ratios**: Sharpe Ratio, Sortino Ratio, Maximum Drawdown (MDD), and Calmar Ratio.
-
-4. **NLP Sentiment Alpha Dynamic Tilting**:
-   - Ingests financial headlines and market commentary.
-   - Computes continuous polarity scores $\alpha_i \in [-1, 1]$ per ticker.
-   - Dynamically tilts base portfolio weights while maintaining standard simplex constraints ($\sum w_i = 1$).
-
-5. **Containerized Interactive Dashboard**:
-   - Streamlit interface for live scenario testing, asset reweighting, and visual risk inspection.
-   - Containerized with Docker and `docker-compose` for reproducible deployments.
-
----
-
-## 📐 Mathematical Formulation
-
-### 1. Portfolio Return and Variance
-$$\mathbb{E}[R_p] = \mathbf{w}^T \boldsymbol{\mu}$$
-$$\sigma_p^2 = \mathbf{w}^T \boldsymbol{\Sigma} \mathbf{w}$$
-
-### 2. Maximum Sharpe Ratio Optimization
-$$\max_{\mathbf{w}} \frac{\mathbf{w}^T \boldsymbol{\mu} - R_f}{\sqrt{\mathbf{w}^T \boldsymbol{\Sigma} \mathbf{w}}} \quad \text{s.t.} \quad \sum_{i=1}^n w_i = 1, \quad 0 \le w_i \le 1$$
-
-### 3. Value at Risk (VaR) & Conditional VaR (CVaR)
-$$\text{VaR}_\alpha = -\inf \{ l \in \mathbb{R} : P(L > l) \le 1 - \alpha \}$$
-$$\text{CVaR}_\alpha = \mathbb{E}[L \mid L \ge \text{VaR}_\alpha]$$
-
-### 4. Correlated Monte Carlo Path Generation
-$$\mathbf{S}_{t+\Delta t} = \mathbf{S}_t \exp \left( \left(\boldsymbol{\mu} - \frac{1}{2}\boldsymbol{\sigma}^2\right)\Delta t + \boldsymbol{\sigma}\sqrt{\Delta t} \, \mathbf{L} \mathbf{Z} \right)$$
-where $\mathbf{Z} \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ and $\mathbf{L}$ is the Cholesky factor of correlation matrix $\mathbf{R}$.
-
----
-
-## 🚀 Quickstart
-
-### 1. Clone & Set Up Virtual Environment
-```bash
-git clone https://github.com/GodxDeepanshu/portfolio-risk-advisor.git
-cd portfolio-risk-advisor
-
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
+```sh
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
+python -m pytest -q
 ```
 
-### 2. Run Interactive Streamlit Dashboard
-```bash
-streamlit run app.py
-```
-Open [http://localhost:8501](http://localhost:8501) in your browser.
+You can also start the dashboard with `docker compose up --build`.
 
-### 3. Run Unit & Integration Test Suite
-```bash
-pytest tests/ -v
-```
+## Try the dashboard
 
----
+1. Open **Holdings and stress tests** and inspect the preloaded allocation.
+2. Edit the current weights, comparison weights, and hypothetical shocks.
+   You can also download the sample holdings and upload an edited CSV.
+3. Review each portfolio's risk metrics and the holdings driving the scenario.
+   Download the JSON report for the input weights, shocks, settings, date
+   coverage, and results. Keep the original prices to reproduce uploaded runs.
+4. Open **Optimization and simulation** to explore the efficient frontier and
+   simulated terminal wealth with synthetic prices and illustrative sentiment.
 
-## 🐳 Docker Deployment
+The holdings CSV columns are `symbol,weight,comparison_weight,shock_pct`.
+Each weight column must sum to one. A weight of 0.25 means 25% and a shock of
+-20 means a 20% price decline. Up to 30 unique symbols are supported.
 
-To build and run via Docker:
-```bash
-docker build -t portfolio-risk-advisor .
-docker run -p 8501:8501 portfolio-risk-advisor
-```
+Without uploaded prices the dashboard uses seeded synthetic data. For your own
+history, upload a wide CSV with a `date` column in YYYY-MM-DD format and one
+column per holdings symbol. Supply complete, positive, USD-denominated adjusted
+closing prices for consecutive common trading sessions. Date coverage is shown
+in the dashboard. No network data provider or API key is required.
 
-Or with Docker Compose:
-```bash
-docker-compose up -d
-```
+## Methodology
 
----
-
-## 📂 Project Structure
-
-```
-portfolio-risk-advisor/
-├── app.py                     # Streamlit Interactive Web Application
-├── Dockerfile                 # Multi-stage production container
-├── docker-compose.yml         # Container orchestration spec
-├── requirements.txt           # Core Python dependencies
-├── src/
-│   ├── __init__.py
-│   ├── data_loader.py         # Correlated Geometric Brownian Motion & market data
-│   ├── markowitz.py           # Efficient Frontier & SLSQP portfolio optimization
-│   ├── monte_carlo.py         # 10,000+ vectorized Monte Carlo simulation engine
-│   ├── risk_metrics.py        # VaR (95%/99%), CVaR, Sharpe, Sortino, MDD
-│   ├── sentiment_alpha.py     # NLP headline sentiment analysis & dynamic tilt
-│   └── portfolio_advisor.py   # Main pipeline orchestrator
-└── tests/
-    └── test_risk_engine.py    # Pytest test suite (100% passing)
-```
-
----
-
-## 👤 Author
-
-**Deepanshu Kushwaha**  
-- Dual-degree: B.S. Data Science (IIT Madras) | B.Tech Electrical Engineering (BIET Jhansi)
-- Aspire Institute Seed Fund Grantee (Harvard Business School faculty initiative)
-- Reliance Foundation Undergraduate STEM Scholar
-- GitHub: [@GodxDeepanshu](https://github.com/GodxDeepanshu) | [@CodeWithDeepanshuk](https://github.com/CodeWithDeepanshuk)
-- Email: deepanshukushwahaiit1@gmail.com
+- Historical paths compound daily simple returns at constant portfolio weights,
+  implying daily rebalancing with zero costs. Arithmetic mean returns and
+  volatility are annualized using 252 sessions.
+- Concentration is the sum of squared weights. A holding's share of portfolio
+  variance is its weight times its covariance with the portfolio, divided by
+  portfolio variance. Negative shares indicate diversification effects.
+- Stress results sum weight times price shock. Drawdown compares portfolio
+  wealth with its running peak, including initial capital.
+- One-day parametric VaR uses a normal-return model. Historical VaR uses the
+  lower return percentile and expected shortfall averages returns at or below
+  the threshold. Dollar loss estimates are floored at zero. The holdings view
+  requires at least 100 observations for 95% historical estimates and 500 for
+  99% estimates. Threshold ties can increase the number of tail observations.
+- Simulations draw daily fixed-weight portfolio returns from a normal model
+  using the estimated weighted mean and covariance. Daily losses are capped at
+  100% before compounding. Simulations assume independent days and fixed
+  parameters. Sentiment scores in the dashboard are illustrative.
+- Uploaded prices are analyzed as supplied. The dashboard checks completeness
+  within each row and relies on the uploader to supply consecutive sessions,
+  corporate-action adjustments, and consistent currency. Historical estimates
+  and hypothetical scenarios are intended for educational analysis.

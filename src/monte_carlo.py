@@ -33,19 +33,14 @@ class MonteCarloEngine:
         Execute vectorized Monte Carlo simulations across portfolio assets.
         Returns path trajectories, percentiles, terminal portfolio values, and tail statistics.
         """
-        np.random.seed(self.seed)
-        n_assets = len(self.weights)
-
-        # Cholesky decomposition of the covariance matrix for correlated daily draws
-        L = np.linalg.cholesky(self.cov_matrix)
-
-        # Generate correlated standard normal random variables: shape (iterations, days, n_assets)
-        random_normals = np.random.normal(size=(iterations, time_horizon_days, n_assets))
-        correlated_daily_returns = np.einsum("ijk,lk->ijl", random_normals, L) + self.mean_returns
-
-        # Multiply by weights to obtain daily portfolio return per simulation
-        # shape: (iterations, time_horizon_days)
-        portfolio_daily_returns = np.dot(correlated_daily_returns, self.weights)
+        # A weighted sum of jointly normal returns is itself normal.
+        mean = self.weights @ self.mean_returns
+        variance = self.weights @ self.cov_matrix @ self.weights
+        portfolio_daily_returns = np.random.default_rng(self.seed).normal(
+            mean, np.sqrt(max(variance, 0.0)), size=(iterations, time_horizon_days)
+        )
+        # A daily loss cannot exceed the full value of a long-only portfolio.
+        np.maximum(portfolio_daily_returns, -1.0, out=portfolio_daily_returns)
 
         # Compound returns across the time horizon
         # Shape: (iterations, time_horizon_days + 1)
